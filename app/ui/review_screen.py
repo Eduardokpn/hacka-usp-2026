@@ -1,8 +1,11 @@
 """Revisar e copiar (F4) e encerrar (F5). Protótipo: página 6 do PDF."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QRegularExpression, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QRegularExpressionValidator
+from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
     QPushButton, QScrollArea, QVBoxLayout, QWidget,
@@ -14,6 +17,7 @@ from app.services.prontuario import ProntuarioErro, abrir_prontuario
 from app.ui import theme
 from app.ui.widgets import IconButton
 
+ASSETS = Path(__file__).resolve().parent / "assets"
 CHECK_OPCOES = [("— não mencionado", None), ("Sim", True), ("Não", False)]
 
 
@@ -154,22 +158,43 @@ class ReviewScreen(QWidget):
 
         root.addSpacing(8)
         foot = QHBoxLayout()
+        foot.setSpacing(14)
         note = QLabel("Ao confirmar, áudio, transcrição e campos desta consulta são apagados.")
         note.setObjectName("hint")
-        foot.addWidget(note)
-        foot.addStretch()
-        enviar = QPushButton("Enviar para o prontuário")
-        enviar.setObjectName("secondary")
-        enviar.setCursor(Qt.PointingHandCursor)
-        enviar.clicked.connect(self._enviar)
-        foot.addWidget(enviar)
-        ok = QPushButton("OK, concluir consulta")
-        ok.setObjectName("primary")
-        ok.setCursor(Qt.PointingHandCursor)
-        ok.setMinimumWidth(200)
-        ok.clicked.connect(self.finished.emit)
-        foot.addWidget(ok)
+        note.setWordWrap(True)
+        foot.addWidget(note, 1)
+        foot.addSpacing(12)
+        foot.addWidget(self._botao("OK, concluir consulta", "secondary", "concluir.svg", self.finished.emit))
+        foot.addWidget(self._botao("Enviar para o prontuário", "primary", "enviar.svg", self._enviar))
         root.addLayout(foot)
+
+    @staticmethod
+    def _botao(texto: str, estilo: str, icone: str, acao) -> QPushButton:
+        botao = QPushButton()
+        botao.setObjectName(estilo)
+        botao.setAccessibleName(texto)
+        botao.setCursor(Qt.PointingHandCursor)
+        botao.clicked.connect(acao)
+
+        conteudo = QHBoxLayout(botao)
+        conteudo.setContentsMargins(18, 10, 18, 10)
+        conteudo.setSpacing(10)
+        conteudo.setAlignment(Qt.AlignCenter)
+
+        svg = QSvgWidget(str(ASSETS / icone))
+        svg.setFixedSize(18, 18)
+        rotulo = QLabel(texto)
+        cor = "white" if estilo == "primary" else theme.INK
+        rotulo.setStyleSheet(f"background: transparent; color: {cor}; font-size: 10.5pt; font-weight: 600;")
+        for item in (svg, rotulo):
+            item.setAttribute(Qt.WA_TransparentForMouseEvents)
+            conteudo.addWidget(item, 0, Qt.AlignVCenter)
+
+        # O QPushButton não dimensiona pelo layout interno.
+        rotulo.ensurePolished()
+        botao.setMinimumWidth(conteudo.sizeHint().width() + 2)
+        botao.setFixedHeight(40)
+        return botao
 
     def load(self, campos: list[Field], valores: dict, transcricao: str):
         self.clear()
