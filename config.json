@@ -1,19 +1,164 @@
 {
   "campos": [
     {
-      "nome": "nome",
-      "contexto": "nome da paciente",
+      "nome": "Número do prontuário",
+      "contexto": "número do prontuário, somente se for dito na consulta",
       "tipo": "texto"
     },
     {
-      "nome": "queixa principal",
-      "contexto": "queixas",
+      "nome": "Data de abertura",
+      "contexto": "data de abertura do prontuário no formato DD/MM/AAAA, somente se for dita na consulta",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Nome completo",
+      "contexto": "nome e sobrenome do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Data de nascimento",
+      "contexto": "no formato DD/MM/AAAA; não calcular a partir da idade",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Sexo",
+      "contexto": "M ou F, somente se for dito ou explicitamente indicado na consulta",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Endereço",
+      "contexto": "rua, número, bairro, cidade e estado do paciente, conforme informado",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Telefones",
+      "contexto": "telefones do próprio paciente, separados por vírgula",
+      "tipo": "texto"
+    },
+    {
+      "nome": "E-mail",
+      "contexto": "e-mail do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Responsável ou cuidador",
+      "contexto": "nome, telefone ou outro contato do responsável ou cuidador, se houver",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Médicos do paciente",
+      "contexto": "médicos que acompanham o paciente, com a especialidade quando citada",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Escolaridade",
+      "contexto": "grau de escolaridade do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Ocupação",
+      "contexto": "profissão ou ocupação atual do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Limitação cognitiva",
+      "contexto": "Sim se relatar limitação de memória ou cognição; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Limitação de locomoção",
+      "contexto": "Sim se relatar dificuldade para andar ou se locomover; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Limitação de visão",
+      "contexto": "Sim se relatar limitação visual; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Limitação de audição",
+      "contexto": "Sim se relatar limitação auditiva; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Outras limitações",
+      "contexto": "limitações que não sejam cognitivas, de locomoção, visão ou audição",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Alergia",
+      "contexto": "substâncias, medicamentos ou alimentos e a reação descrita; escrever 'Nega alergias' se o paciente negar",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Queixa principal",
+      "contexto": "motivo da consulta em uma frase curta, com o tempo de duração",
+      "tipo": "texto"
+    },
+    {
+      "nome": "História da doença atual",
+      "contexto": "início, evolução, características, fatores de melhora e piora, sintomas associados e sintomas negados",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Antecedentes pessoais",
+      "contexto": "doenças prévias, cirurgias e internações",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Antecedentes familiares",
+      "contexto": "doenças relevantes em familiares, indicando o parentesco",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Medicamentos em uso",
+      "contexto": "nome, dose e frequência de cada medicamento de uso atual",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Hábitos de vida",
+      "contexto": "tabagismo, consumo de álcool, outras substâncias, atividade física, alimentação e sono",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Pressão arterial",
+      "contexto": "valor aferido no formato 120 x 80 mmHg",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Frequência cardíaca",
+      "contexto": "valor aferido em batimentos por minuto, somente o número",
       "tipo": "inteiro"
     },
     {
-      "nome": "Sobrenome",
-      "contexto": "segundo nome da pessoa",
+      "nome": "Temperatura",
+      "contexto": "valor aferido em graus Celsius, somente o número",
+      "tipo": "decimal"
+    },
+    {
+      "nome": "Saturação de oxigênio",
+      "contexto": "SpO2 aferida em porcentagem, somente o número",
+      "tipo": "inteiro"
+    },
+    {
+      "nome": "Peso",
+      "contexto": "peso em quilogramas, somente o número",
+      "tipo": "decimal"
+    },
+    {
+      "nome": "Exame físico",
+      "contexto": "achados do exame físico descritos pelo médico, exceto os sinais vitais",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Hipótese diagnóstica",
+      "contexto": "somente a hipótese ou o diagnóstico dito pelo médico; não deduzir",
       "tipo": "texto"
+    },
+    {
+      "nome": "Conduta",
+      "contexto": "tratamento, prescrições, exames solicitados, orientações e retorno definidos pelo médico; não sugerir nada além do que foi dito",
+      "tipo": "texto_longo"
     }
   ]
 }

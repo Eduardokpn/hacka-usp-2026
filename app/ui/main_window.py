@@ -88,8 +88,7 @@ class MainWindow(QMainWindow):
         box.setText("<b>Nada desta consulta ficou guardado neste computador.</b>")
         box.setInformativeText(
             "O áudio, a transcrição e os campos preenchidos foram apagados.\n\n"
-            "Nesta versão de demonstração a transcrição e a interpretação foram simuladas "
-            "no próprio computador: nada foi enviado à API da DeepSeek."
+            "Para gerar o prontuário, o áudio foi enviado à Groq e a transcrição ao Google (Gemini)."
         )
         box.exec()
 

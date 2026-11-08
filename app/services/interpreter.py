@@ -1,19 +1,20 @@
-"""Interpretação mockada. No futuro: API da DeepSeek (deepseek-flash, json_object, temperatura 0).
-
-O prompt e a validação por tipo são reais; só a resposta do modelo é simulada.
-"""
+"""Preenchimento dos campos da configuração a partir da transcrição, com a API do Gemini."""
 from __future__ import annotations
 
 import json
+import os
 import re
-import time
 import unicodedata
 
 from app.models import Field, FieldType
+from app.services.http import ServicoErro, post_com_retry
+
+URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+MODELO_PADRAO = "gemini-3.5-flash-lite"
 
 INSTRUCAO = (
     "Instrução: preencha os campos com base na consulta, em vocabulário médico.\n"
-    "Se a consulta não trouxer a informação de um campo, deixe-o vazio. Não invente.\n"
+    "Se a consulta não trouxer a informação de um campo, use null. Não invente.\n"
     "Responda apenas com um objeto JSON cujas chaves são os nomes dos campos."
 )
 
@@ -26,82 +27,57 @@ def build_prompt(transcricao: str, campos: list[Field]) -> str:
     return "\n".join(linhas)
 
 
-# ---------------------------------------------------------------- mock ----
+# --------------------------------------------------------------- Gemini ----
+
+_TIPOS_SCHEMA = {
+    FieldType.TEXTO: "STRING",
+    FieldType.TEXTO_LONGO: "STRING",
+    FieldType.INTEIRO: "INTEGER",
+    FieldType.DECIMAL: "NUMBER",
+    FieldType.CHECKBOX: "BOOLEAN",
+}
+
+
+def _schema(campos: list[Field]) -> dict:
+    return {
+        "type": "OBJECT",
+        "properties": {c.nome: {"type": _TIPOS_SCHEMA[c.tipo], "nullable": True} for c in campos},
+        "required": [c.nome for c in campos],
+    }
+
 
 def _norm(s: str) -> str:
     s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
     return s.lower()
 
 
-# Ordem importa: a primeira regra que casar com nome/contexto vence.
-# Cada regra: (padrões regex, valores por tipo; "*" vale para qualquer tipo).
-_REGRAS: list[tuple[list[str], dict]] = [
-    ([r"\bqueixa", r"\bmotivo"], {
-        "*": "Cefaleia e febre há 3 dias.",
-    }),
-    ([r"\bhistoria", r"\bhda\b", r"\bevolucao"], {
-        "*": ("Paciente refere cefaleia de início insidioso há 3 dias, de intensidade progressiva, "
-              "associada a febre e mialgia a partir do segundo dia. Relata odinofagia leve. "
-              "Nega tosse e dispneia."),
-    }),
-    ([r"\btemperatura", r"\btax\b", r"\btemp\b"], {
-        "*": "37,8",
-    }),
-    ([r"frequencia cardiaca", r"\bfc\b", r"\bpulso", r"\bbatimento"], {
-        "*": 88,
-    }),
-    ([r"\bsistolica"], {"*": 120}),
-    ([r"\bdiastolica"], {"*": 80}),
-    ([r"\bpressao", r"\bpa\b"], {
-        FieldType.INTEIRO: 120,
-        "*": "120 x 80 mmHg",
-    }),
-    ([r"\bsatura", r"\bspo2"], {"*": 97}),
-    ([r"\bpeso"], {"*": "68"}),
-    ([r"\btabag", r"\bfuma", r"\bcigarr"], {
-        FieldType.CHECKBOX: True,
-        FieldType.INTEIRO: 10,
-        "*": "Tabagista ativo, cerca de 10 cigarros/dia.",
-    }),
-    ([r"\balergi"], {
-        FieldType.CHECKBOX: True,
-        "*": "Dipirona.",
-    }),
-    ([r"\bfebre"], {
-        FieldType.CHECKBOX: True,
-        "*": "Febre há 2 dias, aferida 37,8 °C na consulta.",
-    }),
-    ([r"exame fisico", r"\bexame\b", r"\boroscopia", r"\borofaringe"], {
-        "*": "Orofaringe com hiperemia leve, sem exsudato. FC 88 bpm, PA 120x80 mmHg, Tax 37,8 °C, SpO2 97%.",
-    }),
-    ([r"\bconduta", r"\bplano", r"\borienta"], {
-        "*": "Repouso e hidratação oral. Retorno se piora ou persistência da febre.",
-    }),
-    ([r"\bsintoma"], {
-        "*": "Cefaleia, febre, mialgia e odinofagia leve.",
-    }),
-]
-
-
-class MockInterpreter:
-    """Simula a resposta JSON da DeepSeek casando o campo com palavras-chave."""
-
-    LATENCIA_S = 1.5
+class GeminiInterpreter:
+    """Preenche os campos da configuração a partir da transcrição."""
 
     def interpretar(self, transcricao: str, campos: list[Field]) -> dict:
-        self.ultimo_prompt = build_prompt(transcricao, campos)
-        time.sleep(self.LATENCIA_S)
-        resposta = {}
-        for c in campos:
-            alvo = _norm(f"{c.nome} {c.contexto}")
-            valor = None
-            for padroes, valores in _REGRAS:
-                if any(re.search(p, alvo) for p in padroes):
-                    valor = valores.get(c.tipo, valores.get("*"))
-                    break
-            resposta[c.nome] = valor
-        # Ida e volta em JSON, como viria da API.
-        bruto = json.loads(json.dumps(resposta, ensure_ascii=False))
+        if not transcricao.strip():
+            return {c.nome: None for c in campos}
+        chave = os.environ.get("GEMINI_API_KEY", "")
+        if not chave:
+            raise ServicoErro("Gemini: GEMINI_API_KEY não configurada.")
+        modelo = os.environ.get("GEMINI_MODEL", MODELO_PADRAO)
+        dados = post_com_retry(
+            "Gemini", f"{URL_BASE}/{modelo}:generateContent", timeout=45,
+            headers={"x-goog-api-key": chave},
+            json={
+                "contents": [{"role": "user", "parts": [{"text": build_prompt(transcricao, campos)}]}],
+                "generationConfig": {
+                    "temperature": 0,
+                    "responseMimeType": "application/json",
+                    "responseSchema": _schema(campos),
+                },
+            },
+        )
+        try:
+            partes = dados["candidates"][0]["content"]["parts"]
+            bruto = json.loads("".join(p.get("text", "") for p in partes))
+        except (KeyError, IndexError, TypeError, ValueError) as e:
+            raise ServicoErro("Gemini: resposta inválida.") from e
         return validar_resposta(bruto, campos)
 
 

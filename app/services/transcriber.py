@@ -1,45 +1,23 @@
-"""Transcrição mockada. No futuro: whisper-large-v3-turbo local, em blocos (D13)."""
+"""Transcrição de cada bloco de áudio com whisper-large-v3-turbo, na Groq."""
 from __future__ import annotations
 
-ROTEIRO = [
-    "Médico: Bom dia, o que traz a senhora aqui hoje?",
-    "Paciente: Doutor, estou com dor de cabeça e febre há três dias.",
-    "Médico: A dor começou de repente ou foi aumentando?",
-    "Paciente: Foi aumentando. No segundo dia veio a febre e uma dor no corpo.",
-    "Médico: Teve tosse, dor de garganta ou falta de ar?",
-    "Paciente: Um pouco de dor de garganta, tosse não.",
-    "Médico: A senhora fuma?",
-    "Paciente: Fumo sim, uns dez cigarros por dia.",
-    "Médico: Tem alergia a algum remédio?",
-    "Paciente: Tenho alergia a dipirona.",
-    "Médico: Vou aferir os sinais. Frequência cardíaca 88, temperatura 37,8, pressão 120 por 80.",
-    "Médico: Saturação 97 por cento. Orofaringe com hiperemia leve, sem exsudato.",
-    "Médico: Peso 68 quilos.",
-    "Médico: Vamos tratar como quadro viral, com repouso e hidratação.",
-]
+import os
 
-BLOCO_SEGUNDOS = 5
+from app.services.http import ServicoErro, post_com_retry
+
+URL = "https://api.groq.com/openai/v1/audio/transcriptions"
+MODELO = "whisper-large-v3-turbo"
 
 
-class MockTranscriber:
-    """Devolve a próxima fala do roteiro a cada bloco de áudio."""
-
-    def __init__(self):
-        self._i = 0
-
-    def reset(self) -> None:
-        self._i = 0
-
-    def transcrever_bloco(self) -> str | None:
-        if self._i >= len(ROTEIRO):
-            return None
-        texto = ROTEIRO[self._i]
-        self._i += 1
-        return texto
-
-    def transcrever_restante(self) -> list[str]:
-        """Último trecho ao finalizar (F3.1)."""
-        if self._i < len(ROTEIRO):
-            texto = self.transcrever_bloco()
-            return [texto] if texto else []
-        return []
+class GroqTranscriber:
+    def transcrever(self, wav: bytes) -> str:
+        chave = os.environ.get("GROQ_API_KEY", "")
+        if not chave:
+            raise ServicoErro("Groq: GROQ_API_KEY não configurada.")
+        dados = post_com_retry(
+            "Groq", URL, timeout=30,
+            headers={"Authorization": f"Bearer {chave}"},
+            files={"file": ("bloco.wav", wav, "audio/wav")},
+            data={"model": MODELO, "language": "pt", "temperature": "0", "response_format": "json"},
+        )
+        return str(dados.get("text", "")).strip()

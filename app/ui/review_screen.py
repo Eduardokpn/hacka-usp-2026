@@ -183,7 +183,7 @@ class ReviewScreen(QWidget):
 
     def _show_transcript(self):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Transcrição (simulada)")
+        dlg.setWindowTitle("Transcrição")
         dlg.resize(620, 440)
         dlg.setStyleSheet(f"background:{theme.SURFACE};")
         lay = QVBoxLayout(dlg)
