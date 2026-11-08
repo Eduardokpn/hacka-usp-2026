@@ -1,0 +1,19 @@
+{
+  "campos": [
+    {
+      "nome": "nome",
+      "contexto": "nome da paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "queixa principal",
+      "contexto": "queixas",
+      "tipo": "inteiro"
+    },
+    {
+      "nome": "Sobrenome",
+      "contexto": "segundo nome da pessoa",
+      "tipo": "texto"
+    }
+  ]
+}
