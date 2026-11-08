@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QGraphicsOpacityEffect, QMainWindow, QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
-from app.models import ConfigStore, Field
+from app.models import ConfigStore, Configuracao, Field
 from app.session import Session
 from app.ui.config_screen import ConfigScreen
 from app.ui.record_screen import RecordScreen
@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(820, 600)
 
         self.store = ConfigStore()
-        self.campos: list[Field] = self.store.load()
+        self.config_atual: Configuracao = self.store.load()
         self.session = Session()
 
         root = QWidget()
@@ -47,7 +47,12 @@ class MainWindow(QMainWindow):
         self.config.back.connect(lambda: self._go(self.record))
         self.config.saved.connect(self._save_config)
         self.review.finished.connect(self._finish)
+        self.review.sent.connect(lambda: self.toast.show_message("Prontuário aberto no navegador"))
         self.review.copied.connect(lambda nome: self.toast.show_message(f"“{nome}” copiado"))
+
+    @property
+    def campos(self) -> list[Field]:
+        return self.config_atual.campos_ativos
 
     # --------------------------------------------------------- navegação
     def _go(self, widget: QWidget):
@@ -65,14 +70,14 @@ class MainWindow(QMainWindow):
             self.record.refresh()
 
     def _open_config(self):
-        self.config.load(self.campos)
+        self.config.load(self.config_atual)
         self._go(self.config)
 
-    def _save_config(self, campos: list[Field]):
-        self.campos = campos
-        self.store.save(campos)
+    def _save_config(self, config: Configuracao):
+        self.config_atual = config
+        self.store.save(config)
         self._go(self.record)
-        self.toast.show_message("Configuração salva")
+        self.toast.show_message(f"Template “{config.ativo}” em uso")
 
     def _open_review(self):
         self.review.load(self.campos, self.session.valores, self.session.transcricao)

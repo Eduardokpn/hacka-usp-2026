@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QScrollArea,
-    QToolButton, QVBoxLayout, QWidget,
+    QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton,
+    QScrollArea, QTabBar, QToolButton, QVBoxLayout, QWidget,
 )
 
-from app.models import Field, FieldType
+from app.models import Configuracao, Field, FieldType, Template
 
 COL_NOME, COL_DESC, COL_TIPO = 3, 5, 2  # proporções das colunas
 ACOES_W = 104
@@ -83,13 +83,16 @@ class _FieldRow(QFrame):
 
 class ConfigScreen(QWidget):
     back = Signal()
-    saved = Signal(list)
+    saved = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("screen")
         self.rows: list[_FieldRow] = []
         self.dirty = False
+        self.templates: list[Template] = []
+        self.ativo = ""
+        self._idx = 0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(36, 28, 36, 24)
@@ -98,11 +101,29 @@ class ConfigScreen(QWidget):
         title = QLabel("Configuração")
         title.setObjectName("h1")
         root.addWidget(title)
-        sub = QLabel("Defina os campos do prontuário. O contexto de cada campo orienta a interpretação da consulta.")
+        sub = QLabel("Crie um template para cada tipo de atendimento. A descrição de cada campo orienta a interpretação da consulta.")
         sub.setObjectName("sub")
         sub.setWordWrap(True)
         root.addWidget(sub)
-        root.addSpacing(16)
+        root.addSpacing(12)
+
+        # templates
+        barra = QHBoxLayout()
+        barra.setSpacing(4)
+        self.tabs = QTabBar()
+        self.tabs.setExpanding(False)
+        self.tabs.setDrawBase(False)
+        self.tabs.setUsesScrollButtons(True)
+        self.tabs.currentChanged.connect(self._on_tab)
+        barra.addWidget(self.tabs, 1)
+        self.btn_novo = self._acao("Novo", self._novo)
+        self.btn_duplicar = self._acao("Duplicar", self._duplicar)
+        self.btn_renomear = self._acao("Renomear", self._renomear)
+        self.btn_excluir = self._acao("Excluir", self._excluir)
+        for b in (self.btn_novo, self.btn_duplicar, self.btn_renomear, self.btn_excluir):
+            barra.addWidget(b, 0, Qt.AlignVCenter)
+        root.addLayout(barra)
+        root.addSpacing(12)
 
         # cabeçalho das colunas
         head = QHBoxLayout()
@@ -150,7 +171,7 @@ class ConfigScreen(QWidget):
         self.btn_back.setObjectName("secondary")
         self.btn_back.setCursor(Qt.PointingHandCursor)
         self.btn_back.clicked.connect(self._on_back)
-        self.btn_save = QPushButton("Salvar configuração")
+        self.btn_save = QPushButton("Salvar e usar este template")
         self.btn_save.setObjectName("primary")
         self.btn_save.setCursor(Qt.PointingHandCursor)
         self.btn_save.clicked.connect(self._on_save)
@@ -158,17 +179,123 @@ class ConfigScreen(QWidget):
         foot.addWidget(self.btn_save)
         root.addLayout(foot)
 
-    # ------------------------------------------------------------ lista
-    def load(self, campos: list[Field]):
+    def _acao(self, texto, fn) -> QPushButton:
+        b = QPushButton(texto)
+        b.setObjectName("link")
+        b.setCursor(Qt.PointingHandCursor)
+        b.clicked.connect(fn)
+        return b
+
+    # -------------------------------------------------------- templates
+    def load(self, config: Configuracao):
+        """Abre uma cópia de trabalho: nada muda até salvar."""
+        self.templates = [Template(t.nome, list(t.campos)) for t in config.templates]
+        self.ativo = config.ativo
+        self._idx = [t.nome for t in self.templates].index(config.ativo)
+        self._montar_abas()
+        self._mostrar(self._idx)
+        self.dirty = False
+
+    def _montar_abas(self):
+        self.tabs.blockSignals(True)
+        while self.tabs.count():
+            self.tabs.removeTab(0)
+        for t in self.templates:
+            self.tabs.addTab(f"{t.nome}  (em uso)" if t.nome == self.ativo else t.nome)
+        self.tabs.setCurrentIndex(self._idx)
+        self.tabs.blockSignals(False)
+        self.btn_excluir.setEnabled(len(self.templates) > 1)
+
+    def _mostrar(self, i: int):
         for r in self.rows:
             r.setParent(None)
             r.deleteLater()
         self.rows = []
-        for c in campos:
+        for c in self.templates[i].campos:
             self._insert_row(_FieldRow(c))
         self.error.clear()
-        self.dirty = False
         self._sync()
+        self.scroll.verticalScrollBar().setValue(0)
+
+    def _guardar_aba(self) -> bool:
+        """Copia as linhas para o template aberto; False se houver campo inválido."""
+        campos = self._validate()
+        if campos is None:
+            return False
+        self.templates[self._idx].campos = campos
+        return True
+
+    def _on_tab(self, i: int):
+        if i == self._idx:
+            return
+        if not self._guardar_aba():
+            self.tabs.blockSignals(True)
+            self.tabs.setCurrentIndex(self._idx)
+            self.tabs.blockSignals(False)
+            return
+        self._idx = i
+        self._mostrar(i)
+
+    def _pedir_nome(self, titulo: str, sugestao: str = "", atual: str | None = None) -> str | None:
+        nome, ok = QInputDialog.getText(self, titulo, "Nome do template:", text=sugestao)
+        nome = nome.strip()
+        if not ok:
+            return None
+        if not nome:
+            self.error.setText("O template precisa de um nome.")
+            return None
+        existentes = {t.nome.casefold() for t in self.templates if t.nome != atual}
+        if nome.casefold() in existentes:
+            self.error.setText(f"Já existe um template chamado “{nome}”.")
+            return None
+        return nome
+
+    def _adicionar(self, nome: str, campos: list[Field]):
+        self.templates.append(Template(nome, campos))
+        self._idx = len(self.templates) - 1
+        self._montar_abas()
+        self._mostrar(self._idx)
+        self._mark_dirty()
+
+    def _novo(self):
+        if self._guardar_aba() and (nome := self._pedir_nome("Novo template")):
+            self._adicionar(nome, [])
+
+    def _duplicar(self):
+        if not self._guardar_aba():
+            return
+        origem = self.templates[self._idx]
+        if nome := self._pedir_nome("Duplicar template", f"{origem.nome} (cópia)"):
+            self._adicionar(nome, list(origem.campos))
+
+    def _renomear(self):
+        template = self.templates[self._idx]
+        nome = self._pedir_nome("Renomear template", template.nome, atual=template.nome)
+        if nome and nome != template.nome:
+            if self.ativo == template.nome:
+                self.ativo = nome
+            template.nome = nome
+            self._montar_abas()
+            self._mark_dirty()
+
+    def _excluir(self):
+        template = self.templates[self._idx]
+        resp = QMessageBox.question(
+            self, "Excluir template",
+            f"Excluir o template “{template.nome}” e todos os seus campos?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if resp != QMessageBox.Yes:
+            return
+        del self.templates[self._idx]
+        self._idx = min(self._idx, len(self.templates) - 1)
+        if self.ativo == template.nome:
+            self.ativo = self.templates[0].nome
+        self._montar_abas()
+        self._mostrar(self._idx)
+        self._mark_dirty()
+
+    # ------------------------------------------------------------ lista
 
     def _insert_row(self, row: _FieldRow):
         row.changed.connect(self._mark_dirty)
@@ -238,11 +365,10 @@ class ConfigScreen(QWidget):
         return campos
 
     def _on_save(self):
-        campos = self._validate()
-        if campos is None:
+        if not self._guardar_aba():
             return
         self.dirty = False
-        self.saved.emit(campos)
+        self.saved.emit(Configuracao(self.templates, self.templates[self._idx].nome))
 
     def _on_back(self):
         if self.dirty:

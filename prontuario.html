@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prontuário do paciente</title>
+<style>
+  :root { --tinta:#1c2526; --sec:#5c6b6d; --linha:#d5dcdc; --fundo:#f3f5f4; --papel:#fff; --acento:#17695f; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px 48px; background:var(--fundo); color:var(--tinta);
+         font:15px/1.45 "Segoe UI", system-ui, sans-serif; }
+  .folha { max-width:820px; margin:0 auto; padding:32px 36px; background:var(--papel);
+           border:1px solid var(--linha); border-radius:6px; }
+  h1 { margin:0 0 4px; font-size:24px; text-align:center; }
+  .sub { margin:0 0 20px; text-align:center; color:var(--sec); }
+  fieldset { margin:0 0 20px; padding:0; border:0; }
+  legend, h2 { width:100%; margin:0 0 12px; padding:0 0 6px; border-bottom:2px solid var(--acento);
+               color:var(--acento); font-size:15px; font-weight:600; }
+  .grade { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px 18px; }
+  .largo { grid-column:1 / -1; }
+  label { display:block; font-weight:600; font-size:13px; }
+  input, select, textarea { display:block; width:100%; margin-top:4px; padding:8px 10px; color:inherit;
+    font:inherit; font-weight:400; background:#fff; border:1px solid #b9c3c3; border-radius:4px; }
+  textarea { min-height:92px; resize:vertical; }
+  input:focus, select:focus, textarea:focus { outline:2px solid var(--acento); outline-offset:0; border-color:var(--acento); }
+  .acoes { display:flex; justify-content:flex-end; gap:10px; margin-top:8px; }
+  button { padding:10px 18px; font:inherit; font-weight:600; border-radius:4px; cursor:pointer;
+           color:var(--acento); background:#fff; border:1px solid var(--acento); }
+  button.primario { color:#fff; background:var(--acento); }
+  .doc-campo { margin:0; }
+  .doc-campo dt { font-size:12px; font-weight:600; color:var(--sec); }
+  .doc-campo dd { margin:2px 0 0; padding-bottom:4px; border-bottom:1px solid var(--linha);
+                  min-height:1.5em; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .doc-secao { margin:0 0 18px; break-inside:avoid; }
+  [hidden] { display:none !important; }
+  @media (max-width:560px) {
+    .folha { padding:20px 16px; }
+    .grade { grid-template-columns:minmax(0, 1fr); }
+  }
+  @media print {
+    @page { size:A4; margin:16mm; }
+    body { padding:0; background:#fff; font-size:12px; }
+    .folha { max-width:none; padding:0; border:0; }
+    .acoes { display:none; }
+  }
+</style>
+</head>
+<body>
+<main class="folha">
+  <form id="formulario" novalidate>
+    <h1>Prontuário do paciente</h1>
+    <p class="sub">Preencha os campos e emita o prontuário.</p>
+    <div id="secoes"></div>
+    <div class="acoes">
+      <button type="button" id="limpar">Limpar</button>
+      <button type="submit" class="primario">Emitir prontuário</button>
+    </div>
+  </form>
+
+  <section id="emitido" hidden>
+    <h1>Prontuário do paciente</h1>
+    <p class="sub" id="emissao"></p>
+    <div id="documento"></div>
+    <div class="acoes">
+      <button type="button" id="voltar">Voltar e editar</button>
+      <button type="button" class="primario" id="imprimir">Imprimir ou salvar em PDF</button>
+    </div>
+  </section>
+</main>
+
+<!-- Mesmos campos de config.json: ao alterar a configuração, atualize esta lista. -->
+<script type="application/json" id="campos">{
+  "campos": [
+    {
+      "nome": "Número do prontuário",
+      "contexto": "número do prontuário, somente se for dito na consulta",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Data de abertura",
+      "contexto": "data de abertura do prontuário no formato DD/MM/AAAA, somente se for dita na consulta",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Nome completo",
+      "contexto": "nome e sobrenome do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Data de nascimento",
+      "contexto": "no formato DD/MM/AAAA; não calcular a partir da idade",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Sexo",
+      "contexto": "M ou F, somente se for dito ou explicitamente indicado na consulta",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Endereço",
+      "contexto": "rua, número, bairro, cidade e estado do paciente, conforme informado",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Telefones",
+      "contexto": "telefones do próprio paciente, separados por vírgula",
+      "tipo": "texto"
+    },
+    {
+      "nome": "E-mail",
+      "contexto": "e-mail do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Responsável ou cuidador",
+      "contexto": "nome, telefone ou outro contato do responsável ou cuidador, se houver",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Médicos do paciente",
+      "contexto": "médicos que acompanham o paciente, com a especialidade quando citada",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Escolaridade",
+      "contexto": "grau de escolaridade do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Ocupação",
+      "contexto": "profissão ou ocupação atual do paciente",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Limitação cognitiva",
+      "contexto": "Sim se relatar limitação de memória ou cognição; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Limitação de locomoção",
+      "contexto": "Sim se relatar dificuldade para andar ou se locomover; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Limitação de visão",
+      "contexto": "Sim se relatar limitação visual; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Limitação de audição",
+      "contexto": "Sim se relatar limitação auditiva; Não somente se for negada; null se não for abordada",
+      "tipo": "checkbox"
+    },
+    {
+      "nome": "Outras limitações",
+      "contexto": "limitações que não sejam cognitivas, de locomoção, visão ou audição",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Alergia",
+      "contexto": "substâncias, medicamentos ou alimentos e a reação descrita; escrever 'Nega alergias' se o paciente negar",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Queixa principal",
+      "contexto": "motivo da consulta em uma frase curta, com o tempo de duração",
+      "tipo": "texto"
+    },
+    {
+      "nome": "História da doença atual",
+      "contexto": "início, evolução, características, fatores de melhora e piora, sintomas associados e sintomas negados",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Antecedentes pessoais",
+      "contexto": "doenças prévias, cirurgias e internações",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Antecedentes familiares",
+      "contexto": "doenças relevantes em familiares, indicando o parentesco",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Medicamentos em uso",
+      "contexto": "nome, dose e frequência de cada medicamento de uso atual",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Hábitos de vida",
+      "contexto": "tabagismo, consumo de álcool, outras substâncias, atividade física, alimentação e sono",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Pressão arterial",
+      "contexto": "valor aferido no formato 120 x 80 mmHg",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Frequência cardíaca",
+      "contexto": "valor aferido em batimentos por minuto, somente o número",
+      "tipo": "inteiro"
+    },
+    {
+      "nome": "Temperatura",
+      "contexto": "valor aferido em graus Celsius, somente o número",
+      "tipo": "decimal"
+    },
+    {
+      "nome": "Saturação de oxigênio",
+      "contexto": "SpO2 aferida em porcentagem, somente o número",
+      "tipo": "inteiro"
+    },
+    {
+      "nome": "Peso",
+      "contexto": "peso em quilogramas, somente o número",
+      "tipo": "decimal"
+    },
+    {
+      "nome": "Exame físico",
+      "contexto": "achados do exame físico descritos pelo médico, exceto os sinais vitais",
+      "tipo": "texto_longo"
+    },
+    {
+      "nome": "Hipótese diagnóstica",
+      "contexto": "somente a hipótese ou o diagnóstico dito pelo médico; não deduzir",
+      "tipo": "texto"
+    },
+    {
+      "nome": "Conduta",
+      "contexto": "tratamento, prescrições, exames solicitados, orientações e retorno definidos pelo médico; não sugerir nada além do que foi dito",
+      "tipo": "texto_longo"
+    }
+  ]
+}</script>
+<script>
+  const DADOS = JSON.parse(document.getElementById("campos").textContent);
+  const CAMPOS = DADOS.campos;
+  const SECOES = [
+    ["Identificação", "Sexo"],
+    ["Contato", "Responsável ou cuidador"],
+    ["Perfil", "Ocupação"],
+    ["Limitações e alergia", "Alergia"],
+    ["Anamnese", "Hábitos de vida"],
+    ["Sinais vitais", "Peso"],
+    ["Avaliação e conduta", "Conduta"],
+  ];
+  const VAZIO = "—";
+  const form = document.getElementById("formulario");
+
+  function agrupar() {
+    const grupos = [];
+    let i = 0;
+    for (const [titulo, ultimo] of SECOES) {
+      const fim = CAMPOS.findIndex((c) => c.nome === ultimo);
+      if (fim >= i) { grupos.push([titulo, CAMPOS.slice(i, fim + 1)]); i = fim + 1; }
+    }
+    if (i < CAMPOS.length) grupos.push(["Outros", CAMPOS.slice(i)]);
+    return grupos;
+  }
+
+  function criarEntrada(campo) {
+    let el;
+    if (campo.tipo === "texto_longo") {
+      el = document.createElement("textarea");
+    } else if (campo.tipo === "checkbox") {
+      el = document.createElement("select");
+      for (const [valor, rotulo] of [["", "— não mencionado"], ["Sim", "Sim"], ["Não", "Não"]]) {
+        el.add(new Option(rotulo, valor));
+      }
+    } else {
+      el = document.createElement("input");
+      el.type = "text";
+      if (campo.tipo === "inteiro") { el.inputMode = "numeric"; el.pattern = "-?\\d{1,9}"; el.title = "Somente números inteiros"; }
+      if (campo.tipo === "decimal") { el.inputMode = "decimal"; el.pattern = "-?\\d{1,9}([.,]\\d{1,4})?"; el.title = "Número, com vírgula se precisar"; }
+    }
+    el.name = campo.nome;
+    return el;
+  }
+
+  function montarFormulario() {
+    const destino = document.getElementById("secoes");
+    for (const [titulo, campos] of agrupar()) {
+      const fs = document.createElement("fieldset");
+      fs.appendChild(document.createElement("legend")).textContent = titulo;
+      const grade = fs.appendChild(document.createElement("div"));
+      grade.className = "grade";
+      for (const campo of campos) {
+        const label = grade.appendChild(document.createElement("label"));
+        if (campo.tipo === "texto_longo") label.className = "largo";
+        label.textContent = campo.nome;
+        label.appendChild(criarEntrada(campo));
+      }
+      destino.appendChild(fs);
+    }
+  }
+
+  function valorDe(campo) {
+    let valor = form.elements[campo.nome].value.trim();
+    if (campo.tipo === "decimal") valor = valor.replace(".", ",");
+    return valor || VAZIO;
+  }
+
+  function emitir() {
+    const doc = document.getElementById("documento");
+    doc.replaceChildren();
+    for (const [titulo, campos] of agrupar()) {
+      const secao = doc.appendChild(document.createElement("section"));
+      secao.className = "doc-secao";
+      secao.appendChild(document.createElement("h2")).textContent = titulo;
+      const grade = secao.appendChild(document.createElement("div"));
+      grade.className = "grade";
+      for (const campo of campos) {
+        const dl = grade.appendChild(document.createElement("dl"));
+        dl.className = "doc-campo" + (campo.tipo === "texto_longo" ? " largo" : "");
+        dl.appendChild(document.createElement("dt")).textContent = campo.nome;
+        dl.appendChild(document.createElement("dd")).textContent = valorDe(campo);
+      }
+    }
+    document.getElementById("emissao").textContent = "Emitido em " + new Date().toLocaleString("pt-BR");
+    alternar(true);
+  }
+
+  function alternar(emitido) {
+    form.hidden = emitido;
+    document.getElementById("emitido").hidden = !emitido;
+    window.scrollTo(0, 0);
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (form.reportValidity()) emitir();
+  });
+  document.getElementById("voltar").addEventListener("click", () => alternar(false));
+  document.getElementById("imprimir").addEventListener("click", () => window.print());
+  document.getElementById("limpar").addEventListener("click", () => {
+    if (confirm("Apagar todos os campos preenchidos?")) form.reset();
+  });
+
+  montarFormulario();
+  if (DADOS.valores) {
+    for (const [nome, valor] of Object.entries(DADOS.valores)) {
+      if (form.elements[nome]) form.elements[nome].value = valor;
+    }
+    form.querySelector(".sub").textContent = "Dados recebidos da consulta. Confira e emita o prontuário.";
+  }
+</script>
+</body>
+</html>

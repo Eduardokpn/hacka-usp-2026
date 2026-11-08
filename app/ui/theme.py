@@ -82,6 +82,10 @@ QPushButton#ghost {{ background: transparent; color: {ACCENT}; border: 1px dashe
 QPushButton#ghost:hover {{ background: {ACCENT_WASH}; border-style: solid; }}
 QPushButton#link {{ background: transparent; color: {ACCENT}; border: none; padding: 4px 6px; font-weight: 600; }}
 QPushButton#link:hover {{ text-decoration: underline; }}
+QPushButton#link:disabled {{ color: {MUTED}; }}
+QTabBar::tab {{ background: transparent; color: {SEC}; padding: 8px 14px; border-bottom: 2px solid {LINE}; }}
+QTabBar::tab:hover {{ color: {INK}; }}
+QTabBar::tab:selected {{ color: {ACCENT}; border-bottom: 2px solid {ACCENT}; font-weight: 600; }}
 QToolButton#rowbtn {{
     background: transparent; border: none; border-radius: 6px; padding: 4px; color: {SEC}; font-size: 11pt;
 }}

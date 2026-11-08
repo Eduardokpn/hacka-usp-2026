@@ -4,12 +4,13 @@ from __future__ import annotations
 from PySide6.QtCore import QRegularExpression, Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication, QRegularExpressionValidator
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QPushButton,
-    QScrollArea, QVBoxLayout, QWidget,
+    QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit,
+    QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from app.models import Field, FieldType
 from app.services.interpreter import formatar_valor
+from app.services.prontuario import ProntuarioErro, abrir_prontuario
 from app.ui import theme
 from app.ui.widgets import IconButton
 
@@ -113,6 +114,7 @@ class _FieldCard(QFrame):
 class ReviewScreen(QWidget):
     finished = Signal()
     copied = Signal(str)
+    sent = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -156,6 +158,11 @@ class ReviewScreen(QWidget):
         note.setObjectName("hint")
         foot.addWidget(note)
         foot.addStretch()
+        enviar = QPushButton("Enviar para o prontuário")
+        enviar.setObjectName("secondary")
+        enviar.setCursor(Qt.PointingHandCursor)
+        enviar.clicked.connect(self._enviar)
+        foot.addWidget(enviar)
         ok = QPushButton("OK, concluir consulta")
         ok.setObjectName("primary")
         ok.setCursor(Qt.PointingHandCursor)
@@ -180,6 +187,16 @@ class ReviewScreen(QWidget):
             c.deleteLater()
         self.cards = []
         self._transcricao = ""
+
+    def _enviar(self):
+        campos = [card.campo for card in self.cards]
+        valores = {card.campo.nome: card.texto_para_copiar() for card in self.cards}
+        try:
+            abrir_prontuario(campos, valores)
+        except ProntuarioErro as e:
+            QMessageBox.warning(self, "Prontuário", str(e))
+        else:
+            self.sent.emit()
 
     def _show_transcript(self):
         dlg = QDialog(self)
